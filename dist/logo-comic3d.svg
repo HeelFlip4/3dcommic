@@ -1,0 +1,20 @@
+<svg width="152" height="40" viewBox="0 0 152 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cube" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8CA2FF"/>
+      <stop offset="0.52" stop-color="#7A78FF"/>
+      <stop offset="1" stop-color="#4ED1FF"/>
+    </linearGradient>
+    <linearGradient id="word" x1="38" y1="8" x2="140" y2="34" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4F7FF"/>
+      <stop offset="1" stop-color="#A9D5FF"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <rect x="4" y="8" width="20" height="20" rx="5" fill="url(#cube)"/>
+    <rect x="12" y="4" width="20" height="20" rx="5" fill="url(#cube)" opacity="0.72"/>
+    <path d="M20 8L12 12M32 12L24 16" stroke="#F4F7FF" stroke-opacity="0.55" stroke-width="1.2"/>
+  </g>
+  <text x="40" y="18" fill="url(#word)" font-family="Sora, sans-serif" font-size="14" font-weight="700" letter-spacing="0.2">Comic</text>
+  <text x="40" y="32" fill="#9ED2FF" font-family="Sora, sans-serif" font-size="14" font-weight="700" letter-spacing="0.2">3D</text>
+</svg>
