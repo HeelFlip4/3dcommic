@@ -13,6 +13,7 @@ import {
 import './index.css'
 
 import {
+  afterSubmitSteps,
   contacts,
   heroHighlights,
   heroSteps,
@@ -21,10 +22,12 @@ import {
   portfolio,
   services,
   showcaseImage,
-  stepLabels,
   styleOptions,
 } from './content'
 import { useRevealOnScroll } from './hooks/useRevealOnScroll'
+
+const brandLogo = '/media/logo-brand-168.webp'
+const brandLogoSrcSet = '/media/logo-brand-112.webp 1x, /media/logo-brand-168.webp 2x, /media/logo-brand-224.webp 3x'
 
 const EMPTY_PHOTO_META = {
   width: 0,
@@ -61,10 +64,27 @@ function SocialLinks({ whatsappHref, iconSize = 18 }) {
   )
 }
 
+function Brand() {
+  return (
+    <span className="brand-lockup">
+      <img src={brandLogo} srcSet={brandLogoSrcSet} alt="Comic 3D" className="brand-logo" width="224" height="280" />
+    </span>
+  )
+}
+
+function formatPhoneInput(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
 function App() {
   const [preview, setPreview] = useState('')
-  const [fileName, setFileName] = useState('JPG, PNG ou WEBP ate 10MB')
+  const [fileName, setFileName] = useState('JPG, PNG ou WEBP até 10MB')
   const [fileError, setFileError] = useState('')
+  const [submitError, setSubmitError] = useState('')
   const [photoMeta, setPhotoMeta] = useState(EMPTY_PHOTO_META)
   const [isPreviewRendering, setIsPreviewRendering] = useState(false)
   const [step, setStep] = useState(1)
@@ -74,6 +94,7 @@ function App() {
   const [email, setEmail] = useState('')
   const [notes, setNotes] = useState('')
   const [sent, setSent] = useState(false)
+  const [activeSection, setActiveSection] = useState(navLinks[0]?.href.replace('#', '') ?? 'portfolio')
   const previewRenderTimeout = useRef(null)
 
   useRevealOnScroll('.reveal', `${step}-${Boolean(preview)}`)
@@ -92,18 +113,24 @@ function App() {
     [selectedStyle],
   )
 
+  const normalizedName = useMemo(() => name.trim().replace(/\s+/g, ' '), [name])
+  const phoneDigits = useMemo(() => phone.replace(/\D/g, ''), [phone])
+  const hasNameError = name.length > 0 && normalizedName.length < 2
+  const hasPhoneError = phoneDigits.length > 0 && phoneDigits.length < 10
+  const isInSimulator = activeSection === 'simulador'
+
   const whatsappText = useMemo(() => {
     const lines = [
-      'Ola! Quero solicitar orcamento para miniatura 3D.',
+      'Olá! Quero solicitar orçamento para miniatura 3D.',
       `Modelo escolhido: ${styleInfo.name}`,
-      `Previa visual: ${preview ? styleInfo.name : 'Nao validada'}`,
+      `Prévia visual: ${preview ? styleInfo.name : 'Não validada'}`,
       `Qualidade da foto: ${photoMeta.quality}`,
-      'Valor: a definir apos analise das imagens',
+      'Orçamento: definido após análise das imagens',
       `Nome: ${name || '-'}`,
       `WhatsApp: ${phone || '-'}`,
       `Email: ${email || '-'}`,
-      `Observacoes: ${notes || '-'}`,
-      `Arquivo enviado: ${preview ? fileName : 'Nao'}`,
+      `Observações: ${notes || '-'}`,
+      `Arquivo enviado: ${preview ? fileName : 'Não'}`,
     ]
 
     return encodeURIComponent(lines.join('\n'))
@@ -112,13 +139,41 @@ function App() {
   const whatsappHref = `https://wa.me/${contacts.whatsappNumber}?text=${whatsappText}`
 
   const canProceedToContact = Boolean(preview && !fileError)
-  const canSubmit = Boolean(name.trim() && phone.trim() && preview && !fileError)
+  const canSubmit = Boolean(normalizedName.length >= 2 && phoneDigits.length >= 10 && preview && !fileError)
+
+  useEffect(() => {
+    const sectionIds = navLinks.map((link) => link.href.replace('#', ''))
+    const sections = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter(Boolean)
+
+    if (!sections.length || !('IntersectionObserver' in window)) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+
+        if (!visible.length) return
+        setActiveSection(visible[0].target.id)
+      },
+      {
+        rootMargin: '-30% 0px -45% 0px',
+        threshold: [0.15, 0.35, 0.6],
+      },
+    )
+
+    sections.forEach((section) => observer.observe(section))
+    return () => observer.disconnect()
+  }, [])
 
   const handleFile = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
 
     setFileError('')
+    setSubmitError('')
     setSent(false)
     setIsPreviewRendering(false)
 
@@ -128,7 +183,7 @@ function App() {
     }
 
     if (!file.type.startsWith('image/')) {
-      setFileError('Formato invalido. Use JPG, PNG ou WEBP.')
+      setFileError('Formato inválido. Use JPG, PNG ou WEBP.')
       return
     }
 
@@ -149,7 +204,7 @@ function App() {
       let quality = 'Boa'
 
       if (image.width >= 1700 && image.height >= 1700 && sizeMb <= 8) quality = 'Excelente'
-      if (image.width < 1000 || image.height < 1000) quality = 'Basica'
+      if (image.width < 1000 || image.height < 1000) quality = 'Básica'
 
       setPhotoMeta({
         width: image.width,
@@ -161,7 +216,7 @@ function App() {
 
     image.onerror = () => {
       setPhotoMeta(EMPTY_PHOTO_META)
-      setFileError('Nao foi possivel ler a imagem. Tente outro arquivo.')
+      setFileError('Não foi possível ler a imagem. Tente outro arquivo.')
     }
 
     image.src = localUrl
@@ -196,16 +251,20 @@ function App() {
     setStep((previous) => Math.max(previous - 1, 1))
   }
 
-  const handleStepChange = (targetStep) => {
-    if (targetStep === 2 && !canProceedToContact) return
-    setStep(targetStep)
-  }
-
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!canSubmit) return
-    setSent(true)
-    window.open(whatsappHref, '_blank', 'noopener,noreferrer')
+    const popup = window.open(whatsappHref, '_blank', 'noopener,noreferrer')
+
+    if (popup) {
+      popup.focus?.()
+      setSent(true)
+      setSubmitError('')
+      return
+    }
+
+    setSent(false)
+    setSubmitError('Não foi possível abrir o WhatsApp automaticamente. Toque no botão flutuante para continuar.')
   }
 
   return (
@@ -217,13 +276,17 @@ function App() {
       <header className="topbar">
         <div className="container topbar-inner">
           <a href="#inicio" className="brand" aria-label="Comic 3D inicio">
-            <span className="brand-cube" aria-hidden="true" />
-            <span className="brand-text">Comic 3D</span>
+            <Brand />
           </a>
 
           <nav className="main-nav" aria-label="Navegacao principal">
             {navLinks.map((link) => (
-              <a key={link.href} href={link.href}>
+              <a
+                key={link.href}
+                href={link.href}
+                className={activeSection === link.href.replace('#', '') ? 'is-active' : undefined}
+                onClick={() => setActiveSection(link.href.replace('#', ''))}
+              >
                 {link.label}
               </a>
             ))}
@@ -244,10 +307,10 @@ function App() {
             <div className="hero-copy reveal">
               <p className="hero-kicker">ATELIER DE MINIATURAS 3D</p>
               <h1>
-                Transforme fotos em <span>pecas colecionaveis</span>
+                Transforme fotos em <span>peças colecionáveis</span>
               </h1>
               <p className="hero-description">
-                Envie sua foto, valide a previa artistica e finalize com seus dados para orcamento manual da equipe.
+                Envie sua foto, valide a prévia artística e finalize com seus dados para orçamento manual da equipe.
               </p>
 
               <ul className="hero-highlights" aria-label="Diferenciais">
@@ -264,11 +327,11 @@ function App() {
                   Iniciar simulador <ArrowRight size={18} />
                 </a>
                 <a href="#portfolio" className="btn btn-secondary">
-                  Ver portfolio
+                  Ver portfólio
                 </a>
               </div>
 
-              <p className="hero-note">Sem tabela de preco fixa: cada pedido recebe analise personalizada.</p>
+              <p className="hero-note">Sem tabela de preço fixa: cada pedido recebe análise personalizada.</p>
             </div>
 
             <div className="hero-panel reveal">
@@ -277,7 +340,17 @@ function App() {
                   <span>Foto</span>
                   <span>Miniatura</span>
                 </div>
-                <img src={showcaseImage} alt="Comparacao entre foto original e miniatura 3D" fetchPriority="high" />
+                <picture>
+                  <source type="image/webp" srcSet={showcaseImage.webpSrcSet} sizes={showcaseImage.sizes} />
+                  <img
+                    src={showcaseImage.src}
+                    srcSet={showcaseImage.jpgSrcSet}
+                    sizes={showcaseImage.sizes}
+                    alt="Comparação entre foto original e miniatura 3D"
+                    fetchPriority="high"
+                    decoding="async"
+                  />
+                </picture>
               </figure>
 
               <ol className="hero-flow" aria-label="Como funciona">
@@ -298,8 +371,8 @@ function App() {
         <section id="portfolio" className="section-block">
           <div className="container">
             <SectionHeading
-              kicker="Portfolio"
-              title="Pecas"
+              kicker="Portfólio"
+              title="Peças"
               highlight="Entregues"
               description="Miniaturas finalizadas com pintura manual e acabamento de vitrine."
             />
@@ -308,7 +381,19 @@ function App() {
               {portfolio.map((item, index) => (
                 <article className="portfolio-card reveal" style={{ transitionDelay: `${index * 45}ms` }} key={item.title}>
                   <div className="portfolio-image-wrap">
-                    <img src={item.image} alt={item.title} loading="lazy" decoding="async" />
+                    <picture>
+                      <source type="image/avif" srcSet={item.avifSrcSet} sizes={item.sizes} />
+                      <source type="image/webp" srcSet={item.webpSrcSet} sizes={item.sizes} />
+                      <img
+                        src={item.image}
+                        srcSet={item.jpgSrcSet}
+                        sizes={item.sizes}
+                        alt={item.title}
+                        loading="lazy"
+                        decoding="async"
+                        style={{ objectPosition: item.position }}
+                      />
+                    </picture>
                   </div>
                   <div className="portfolio-meta">
                     <h3>{item.title}</h3>
@@ -324,29 +409,10 @@ function App() {
           <div className="container">
             <SectionHeading
               kicker="Simulador"
-              title="Aprovacao"
+              title="Aprovação"
               highlight="Visual"
-              description="Envie a foto, valide o modelo e finalize o pedido com seus dados para orcamento."
+              description="Envie a foto, valide o modelo e finalize o pedido com seus dados para orçamento."
             />
-
-            <div className="stepper" role="tablist" aria-label="Etapas do simulador">
-              {stepLabels.map((label, index) => {
-                const current = index + 1
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    className={`step-chip ${step === current ? 'active' : ''}`}
-                    onClick={() => handleStepChange(current)}
-                    role="tab"
-                    aria-selected={step === current}
-                  >
-                    <span>{current}</span>
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
 
             <div className="quote-layout">
               <form className="quote-card reveal" onSubmit={handleSubmit}>
@@ -359,7 +425,7 @@ function App() {
 
                 {step === 1 && (
                   <div className="quote-step-panel reveal">
-                    <h3>1. Envie sua foto e escolha o modelo</h3>
+                    <h3>1. Envie sua foto e escolha o estilo</h3>
 
                     <div className="style-picker">
                       {styleOptions.map((option) => (
@@ -374,19 +440,25 @@ function App() {
                         </button>
                       ))}
                     </div>
-                    <p className="step-helper">Todos os modelos ja seguem padrao de tamanho e pintura da equipe.</p>
+                    <p className="step-helper">Os modelos seguem o padrão técnico da equipe e recebem ajuste manual na etapa final.</p>
 
                     <label className="upload-card" htmlFor="photo-upload">
-                      <input id="photo-upload" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFile} />
-                      {preview ? <img src={preview} alt="Preview da foto enviada" /> : <Upload size={34} />}
+                      <input
+                        id="photo-upload"
+                        type="file"
+                        className="upload-input"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleFile}
+                      />
+                      {preview ? <img src={preview} alt="Prévia da foto enviada" /> : <Upload size={34} />}
                       <strong>{preview ? 'Foto carregada' : 'Enviar foto'}</strong>
                       <span>{fileName}</span>
                     </label>
 
                     <ul className="upload-hints">
-                      <li>Use imagem nitida e bem iluminada.</li>
+                      <li>Use imagem nítida e bem iluminada.</li>
                       <li>Centralize rosto ou frente do pet.</li>
-                      <li>Envie angulos extras depois pelo WhatsApp.</li>
+                      <li>Envie ângulos extras depois pelo WhatsApp.</li>
                     </ul>
 
                     {fileError && (
@@ -398,9 +470,13 @@ function App() {
                     {preview && (
                       <div className="preview-lab" aria-live="polite">
                         <div className="preview-head">
-                          <p className="preview-title">Validacao visual antes do envio</p>
+                          <p className="preview-title">Validação visual antes do envio</p>
                           <span className="preview-quality">Foto {photoMeta.quality}</span>
                         </div>
+
+                        <p className="preview-disclaimer">
+                          <AlertCircle size={14} /> Prévia ilustrativa para linguagem visual. A miniatura final é modelada manualmente.
+                        </p>
 
                         <div className="preview-stage">
                           <article className="style-render original">
@@ -409,7 +485,7 @@ function App() {
                           </article>
 
                           <article className={`style-render style-${selectedStyle} ${isPreviewRendering ? 'is-rendering' : ''}`}>
-                            <img src={preview} alt={`Previa no estilo ${styleInfo.name}`} />
+                            <img src={preview} alt={`Prévia no estilo ${styleInfo.name}`} />
                             <span>
                               {isPreviewRendering ? (
                                 <>
@@ -439,7 +515,7 @@ function App() {
 
                         <div className="preview-metrics">
                           <div>
-                            <small>Resolucao</small>
+                            <small>Resolução</small>
                             <strong>{photoMeta.width ? `${photoMeta.width} x ${photoMeta.height}` : '--'}</strong>
                           </div>
                           <div>
@@ -452,9 +528,6 @@ function App() {
                           </div>
                         </div>
 
-                        <p className="preview-note">
-                          A previa e artistica para validar linguagem. A modelagem final passa por ajuste manual antes da producao.
-                        </p>
                       </div>
                     )}
                   </div>
@@ -467,7 +540,19 @@ function App() {
                     <div className="field-grid">
                       <label>
                         <span>Nome</span>
-                        <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Seu nome" required />
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(event) => {
+                            setName(event.target.value)
+                            setSubmitError('')
+                          }}
+                          placeholder="Seu nome"
+                          autoComplete="name"
+                          aria-invalid={hasNameError ? 'true' : undefined}
+                          required
+                        />
+                        {hasNameError && <small className="field-error">Digite seu nome com pelo menos 2 letras.</small>}
                       </label>
 
                       <label>
@@ -475,10 +560,17 @@ function App() {
                         <input
                           type="tel"
                           value={phone}
-                          onChange={(event) => setPhone(event.target.value)}
+                          onChange={(event) => {
+                            setPhone(formatPhoneInput(event.target.value))
+                            setSubmitError('')
+                          }}
                           placeholder="(11) 99999-9999"
+                          inputMode="numeric"
+                          autoComplete="tel-national"
+                          aria-invalid={hasPhoneError ? 'true' : undefined}
                           required
                         />
+                        {hasPhoneError && <small className="field-error">Digite um WhatsApp válido com DDD.</small>}
                       </label>
 
                       <label>
@@ -486,18 +578,25 @@ function App() {
                         <input
                           type="email"
                           value={email}
-                          onChange={(event) => setEmail(event.target.value)}
-                          placeholder="voce@email.com"
+                          onChange={(event) => {
+                            setEmail(event.target.value)
+                            setSubmitError('')
+                          }}
+                          placeholder="você@email.com"
+                          autoComplete="email"
                         />
                       </label>
 
                       <label className="field-full">
-                        <span>Observacoes (opcional)</span>
+                        <span>Observações (opcional)</span>
                         <textarea
                           rows="3"
                           value={notes}
-                          onChange={(event) => setNotes(event.target.value)}
-                          placeholder="Ex.: pose especifica, base com nome, detalhes de cor"
+                          onChange={(event) => {
+                            setNotes(event.target.value)
+                            setSubmitError('')
+                          }}
+                          placeholder="Ex.: pose específica, base com nome, detalhes de cor"
                         />
                       </label>
                     </div>
@@ -505,6 +604,12 @@ function App() {
                     {sent && (
                       <p className="sent-note" role="status">
                         <Check size={16} /> Resumo pronto. O WhatsApp foi aberto com os dados do pedido.
+                      </p>
+                    )}
+
+                    {submitError && (
+                      <p className="submit-error" role="alert">
+                        <AlertCircle size={16} /> {submitError}
                       </p>
                     )}
                   </div>
@@ -530,6 +635,10 @@ function App() {
                     </button>
                   )}
                 </div>
+
+                {step === 1 && !canProceedToContact && (
+                  <p className="inline-helper">Envie uma foto para continuar para o contato.</p>
+                )}
               </form>
 
               <aside className="summary-card reveal">
@@ -542,22 +651,27 @@ function App() {
                   </div>
                   <div>
                     <dt>Foto</dt>
-                    <dd>{preview ? photoMeta.quality : 'Nao enviada'}</dd>
+                    <dd>{preview ? photoMeta.quality : 'Não enviada'}</dd>
                   </div>
                 </dl>
 
                 <div className="summary-row">
-                  <span>Janela de producao</span>
-                  <strong>5 a 10 dias</strong>
+                  <span>Prazo de entrega</span>
+                  <strong>Definido após análise</strong>
                 </div>
 
-                <p className="summary-label">Valor</p>
-                <p className="summary-value">Sob analise</p>
-                <p className="summary-note">O valor final e enviado manualmente apos revisao das fotos.</p>
+                <p className="summary-label">Orçamento</p>
+                <p className="summary-value">Análise manual</p>
+                <p className="summary-note">O valor final é enviado manualmente após revisão das fotos.</p>
 
-                <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-primary summary-btn">
-                  Enviar no WhatsApp
-                </a>
+                <div className="summary-next">
+                  <h4>Próximos passos</h4>
+                  <ul>
+                    {afterSubmitSteps.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               </aside>
             </div>
           </div>
@@ -566,10 +680,10 @@ function App() {
         <section id="produtos" className="section-block">
           <div className="container">
             <SectionHeading
-              kicker="Aplicacoes"
+              kicker="Aplicações"
               title="Onde"
               highlight="Atuamos"
-              description="Do presente afetivo ao colecionavel autoral e series para marcas."
+              description="Do presente afetivo ao colecionável autoral e séries para marcas."
             />
 
             <div className="service-grid">
@@ -590,13 +704,10 @@ function App() {
         <section id="orcamento" className="cta">
           <div className="container cta-content reveal">
             <h2>Pronto para iniciar sua miniatura?</h2>
-            <p>Configure sua peca no simulador e envie o briefing para avaliacao tecnica.</p>
+            <p>Configure sua peça no simulador e envie o briefing para avaliação técnica.</p>
             <div className="cta-actions">
               <a href="#simulador" className="btn btn-primary">
                 Montar pedido <ArrowRight size={18} />
-              </a>
-              <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-secondary">
-                <MessageCircle size={18} /> WhatsApp
               </a>
             </div>
           </div>
@@ -607,8 +718,7 @@ function App() {
         <div className="container footer-grid">
           <div className="footer-brand">
             <a href="#inicio" className="brand" aria-label="Voltar ao topo">
-              <span className="brand-cube" aria-hidden="true" />
-              <span className="brand-text">Comic 3D</span>
+              <Brand />
             </a>
             <p>Atelier digital de miniaturas 3D sob encomenda.</p>
           </div>
@@ -620,14 +730,24 @@ function App() {
 
           <div>
             <h4>Contato</h4>
-            <p>{contacts.email}</p>
+            <p>
+              <a className="footer-contact-link" href={`mailto:${contacts.email}`}>
+                {contacts.email}
+              </a>
+            </p>
           </div>
         </div>
 
         <div className="container footer-bottom">© 2026 Comic 3D. Todos os direitos reservados.</div>
       </footer>
 
-      <a className="floating-wa" href={whatsappHref} target="_blank" rel="noreferrer" aria-label="Abrir WhatsApp">
+      <a
+        className={`floating-wa ${isInSimulator ? 'is-hidden-mobile' : ''}`}
+        href={whatsappHref}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Abrir WhatsApp"
+      >
         <MessageCircle size={20} />
         <span>Falar no WhatsApp</span>
       </a>
