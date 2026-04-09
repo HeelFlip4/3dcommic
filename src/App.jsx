@@ -36,6 +36,8 @@ const EMPTY_PHOTO_META = {
   quality: '-',
 }
 
+
+
 function SectionHeading({ kicker, title, highlight, description }) {
   return (
     <div className="section-heading reveal">
